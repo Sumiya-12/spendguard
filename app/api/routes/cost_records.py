@@ -39,3 +39,17 @@ def get_cost_records(provider: Optional[str] = Query(None)):
         "count": len(filtered_records),
         "data": filtered_records
     }
+
+@router.get("/total-cost")
+def get_total_cost(provider: Optional[str] = Query(None)):
+    total_cost = 0.0
+
+    for record in cost_records_db:
+        if provider is None or record["provider"].lower() == provider.lower():
+            total_cost += record["cost_amount"]
+
+    return {
+        "provider_filter": provider,
+        "total_cost": total_cost,
+        "currency": "USD"
+    }
