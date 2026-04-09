@@ -11,8 +11,6 @@ cost_records_db = []
 @router.post("")
 def create_cost_record(payload: CostRecordCreate):
     record = payload.model_dump()
-
-    # store the record
     cost_records_db.append(record)
 
     return {
@@ -22,34 +20,27 @@ def create_cost_record(payload: CostRecordCreate):
 
 
 @router.get("")
-def get_cost_records(provider: Optional[str] = Query(None)):
-    if provider is None:
-        return {
-            "count": len(cost_records_db),
-            "data": cost_records_db
-        }
-
+def get_cost_records(
+    provider: Optional[str] = Query(None),
+    environment: Optional[str] = Query(None)
+):
     filtered_records = []
 
     for record in cost_records_db:
-        if record["provider"].lower() == provider.lower():
+        provider_match = (
+            provider is None or
+            record["provider"].lower() == provider.lower()
+        )
+
+        environment_match = (
+            environment is None or
+            (record["environment"] and record["environment"].lower() == environment.lower())
+        )
+
+        if provider_match and environment_match:
             filtered_records.append(record)
 
     return {
         "count": len(filtered_records),
         "data": filtered_records
-    }
-
-@router.get("/total-cost")
-def get_total_cost(provider: Optional[str] = Query(None)):
-    total_cost = 0.0
-
-    for record in cost_records_db:
-        if provider is None or record["provider"].lower() == provider.lower():
-            total_cost += record["cost_amount"]
-
-    return {
-        "provider_filter": provider,
-        "total_cost": total_cost,
-        "currency": "USD"
     }
