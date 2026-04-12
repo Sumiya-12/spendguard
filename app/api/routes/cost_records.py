@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -128,4 +128,24 @@ def get_total_cost(
         "environment_filter": environment,
         "total_cost": total_cost,
         "currency": "USD"
+    }
+
+@router.get("/{record_id}")
+def get_cost_record_by_id(record_id: int, db: Session = Depends(get_db)):
+    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+
+    if record is None:
+        raise HTTPException(status_code=404, detail="Cost record not found")
+
+    return {
+        "id": record.id,
+        "provider": record.provider,
+        "account_name": record.account_name,
+        "service_name": record.service_name,
+        "resource_id": record.resource_id,
+        "environment": record.environment,
+        "owner": record.owner,
+        "cost_amount": record.cost_amount,
+        "currency": record.currency,
+        "usage_date": str(record.usage_date),
     }
