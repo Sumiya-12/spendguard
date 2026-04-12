@@ -48,6 +48,8 @@ def create_cost_record(payload: CostRecordCreate, db: Session = Depends(get_db))
 def get_cost_records(
     provider: Optional[str] = Query(None),
     environment: Optional[str] = Query(None),
+    limit: int = Query(10),
+    offset: int = Query(0),
     db: Session = Depends(get_db)
 ):
     query = db.query(CostRecord)
@@ -57,7 +59,8 @@ def get_cost_records(
 
     if environment is not None:
         query = query.filter(CostRecord.environment.ilike(environment))
-
+     
+    query = query.limit(limit).offset(offset) #Pagination applied here
     records = query.all()
 
     data = []
