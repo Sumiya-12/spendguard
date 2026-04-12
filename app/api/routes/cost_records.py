@@ -48,6 +48,8 @@ def create_cost_record(payload: CostRecordCreate, db: Session = Depends(get_db))
 def get_cost_records(
     provider: Optional[str] = Query(None),
     environment: Optional[str] = Query(None),
+    sort_by: str = Query("usage_date"),
+    order: str = Query("desc"),
     limit: int = Query(10),
     offset: int = Query(0),
     db: Session = Depends(get_db)
@@ -59,8 +61,24 @@ def get_cost_records(
 
     if environment is not None:
         query = query.filter(CostRecord.environment.ilike(environment))
-     
-    query = query.limit(limit).offset(offset) #Pagination applied here
+
+    allowed_sort_fields = {
+        "id": CostRecord.id,
+        "provider": CostRecord.provider,
+        "environment": CostRecord.environment,
+        "cost_amount": CostRecord.cost_amount,
+        "usage_date": CostRecord.usage_date,
+    }
+
+    sort_column = allowed_sort_fields.get(sort_by, CostRecord.usage_date)
+
+    if order.lower() == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    query = query.limit(limit).offset(offset)
+
     records = query.all()
 
     data = []
@@ -80,9 +98,12 @@ def get_cost_records(
 
     return {
         "count": len(data),
+        "sort_by": sort_by,
+        "order": order,
+        "limit": limit,
+        "offset": offset,
         "data": data
     }
-
 
 @router.get("/total-cost")
 def get_total_cost(
