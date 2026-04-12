@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.schemas.cost_record import CostRecordCreate
 from app.models.cost_record import CostRecord
 from app.core.database import get_db
@@ -86,7 +87,7 @@ def get_total_cost(
     environment: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    query = db.query(CostRecord)
+    query = db.query(func.sum(CostRecord.cost_amount))
 
     if provider is not None:
         query = query.filter(CostRecord.provider.ilike(provider))
@@ -94,12 +95,10 @@ def get_total_cost(
     if environment is not None:
         query = query.filter(CostRecord.environment.ilike(environment))
 
-    records = query.all()
+    total_cost = query.scalar()
 
-    total_cost = 0.0
-    for record in records:
-        total_cost += record.cost_amount
-
+    if total_cost is None:
+        total_cost = 0.0
     return {
         "provider_filter": provider,
         "environment_filter": environment,
