@@ -149,3 +149,18 @@ def get_cost_record_by_id(record_id: int, db: Session = Depends(get_db)):
         "currency": record.currency,
         "usage_date": str(record.usage_date),
     }
+
+@router.delete("/{record_id}")
+def delete_cost_record(record_id: int, db: Session = Depends(get_db)):
+    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+
+    if record is None:
+        raise HTTPException(status_code=404, detail="Cost record not found")
+
+    db.delete(record)
+    db.commit()
+
+    return {
+        "message": "Cost record deleted successfully",
+        "deleted_id": record_id
+    }
