@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.schemas.cost_record import CostRecordCreate
+from app.schemas.cost_record import CostRecordCreate, CostRecordUpdate
 from app.models.cost_record import CostRecord
 from app.core.database import get_db
 
@@ -163,4 +163,39 @@ def delete_cost_record(record_id: int, db: Session = Depends(get_db)):
     return {
         "message": "Cost record deleted successfully",
         "deleted_id": record_id
+    }
+
+@router.patch("/{record_id}")
+def patch_cost_record(
+    record_id: int,
+    payload: CostRecordUpdate,
+    db: Session = Depends(get_db)
+):
+    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+
+    if record is None:
+        raise HTTPException(status_code=404, detail="Cost record not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(record, key, value)
+
+    db.commit()
+    db.refresh(record)
+
+    return {
+        "message": "Cost record updated successfully",
+        "data": {
+            "id": record.id,
+            "provider": record.provider,
+            "account_name": record.account_name,
+            "service_name": record.service_name,
+            "resource_id": record.resource_id,
+            "environment": record.environment,
+            "owner": record.owner,
+            "cost_amount": record.cost_amount,
+            "currency": record.currency,
+            "usage_date": str(record.usage_date),
+        }
     }
