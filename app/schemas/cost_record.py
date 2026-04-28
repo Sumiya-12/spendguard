@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import date
 from enum import Enum
@@ -35,4 +35,24 @@ class CostRecordUpdate(BaseModel):
     currency: Optional[str] = None
     usage_date: Optional[date] = None
 
+class CostRecordResponse(BaseModel):
+    id: int
+    provider: ProviderEnum
+    account_name: str
+    service_name: str
+    environment: EnvironmentEnum
+    owner: str
+    cost_amount: float
+    currency: str
+    usage_date: date
 
+    class Config:
+        from_attributes = True
+
+class CostRecordListResponse(BaseModel):
+    count: int
+    sort_by: str
+    order: str
+    limit: int
+    offset: int
+    data: List[CostRecordResponse]

@@ -1,109 +1,35 @@
 from fastapi import APIRouter, Query, Depends, HTTPException
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.schemas.cost_record import CostRecordCreate, CostRecordUpdate
+from app.services.cost_record_service import get_cost_record_by_id, delete_cost_record_by_id, create_cost_record, update_cost_record_by_id, get_cost_records
+from app.schemas.cost_record import CostRecordCreate, CostRecordUpdate, CostRecordResponse, CostRecordListResponse
+from app.schemas.cost_record import ProviderEnum, EnvironmentEnum
 from app.models.cost_record import CostRecord
 from app.core.database import get_db
 
 router = APIRouter(prefix="/cost-records", tags=["Cost Records"])
 
 
-@router.post("")
-def create_cost_record(payload: CostRecordCreate, db: Session = Depends(get_db)):
-    record = CostRecord(
-        provider=payload.provider,
-        account_name=payload.account_name,
-        service_name=payload.service_name,
-        resource_id=payload.resource_id,
-        environment=payload.environment,
-        owner=payload.owner,
-        cost_amount=payload.cost_amount,
-        currency=payload.currency,
-        usage_date=payload.usage_date,
-    )
+@router.post("/", response_model=CostRecordResponse)
+def create_cost_record_route(payload: CostRecordCreate, db: Session = Depends(get_db)):
+    record = create_cost_record(db, payload)
 
-    db.add(record)
-    db.commit()
-    db.refresh(record)
-
-    return {
-        "message": "Cost record stored successfully",
-        "data": {
-            "id": record.id,
-            "provider": record.provider,
-            "account_name": record.account_name,
-            "service_name": record.service_name,
-            "resource_id": record.resource_id,
-            "environment": record.environment,
-            "owner": record.owner,
-            "cost_amount": record.cost_amount,
-            "currency": record.currency,
-            "usage_date": str(record.usage_date),
-        }
-    }
+    return record
 
 
-@router.get("")
-def get_cost_records(
-    provider: Optional[str] = Query(None),
-    environment: Optional[str] = Query(None),
+@router.get("/", response_model=CostRecordListResponse)
+def get_cost_records_route(
+    provider: Optional[ProviderEnum] = Query(None),
+    environment: Optional[EnvironmentEnum] = Query(None),
     sort_by: str = Query("usage_date"),
     order: str = Query("desc"),
     limit: int = Query(10),
     offset: int = Query(0),
     db: Session = Depends(get_db)
 ):
-    query = db.query(CostRecord)
 
-    if provider is not None:
-        query = query.filter(CostRecord.provider.ilike(provider))
-
-    if environment is not None:
-        query = query.filter(CostRecord.environment.ilike(environment))
-
-    allowed_sort_fields = {
-        "id": CostRecord.id,
-        "provider": CostRecord.provider,
-        "environment": CostRecord.environment,
-        "cost_amount": CostRecord.cost_amount,
-        "usage_date": CostRecord.usage_date,
-    }
-
-    sort_column = allowed_sort_fields.get(sort_by, CostRecord.usage_date)
-
-    if order.lower() == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
-
-    query = query.limit(limit).offset(offset)
-
-    records = query.all()
-
-    data = []
-    for record in records:
-        data.append({
-            "id": record.id,
-            "provider": record.provider,
-            "account_name": record.account_name,
-            "service_name": record.service_name,
-            "resource_id": record.resource_id,
-            "environment": record.environment,
-            "owner": record.owner,
-            "cost_amount": record.cost_amount,
-            "currency": record.currency,
-            "usage_date": str(record.usage_date),
-        })
-
-    return {
-        "count": len(data),
-        "sort_by": sort_by,
-        "order": order,
-        "limit": limit,
-        "offset": offset,
-        "data": data
-    }
+    return get_cost_records(db, provider, environment, sort_by, order, limit, offset)
 
 @router.get("/total-cost")
 def get_total_cost(
@@ -130,72 +56,33 @@ def get_total_cost(
         "currency": "USD"
     }
 
-@router.get("/{record_id}")
-def get_cost_record_by_id(record_id: int, db: Session = Depends(get_db)):
-    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+@router.get("/{record_id}", response_model=CostRecordResponse)
+def get_cost_record_by_id_route(record_id: int, db: Session = Depends(get_db)):
+    record = get_cost_record_by_id(db, record_id)
 
     if record is None:
         raise HTTPException(status_code=404, detail="Cost record not found")
 
-    return {
-        "id": record.id,
-        "provider": record.provider,
-        "account_name": record.account_name,
-        "service_name": record.service_name,
-        "resource_id": record.resource_id,
-        "environment": record.environment,
-        "owner": record.owner,
-        "cost_amount": record.cost_amount,
-        "currency": record.currency,
-        "usage_date": str(record.usage_date),
-    }
+    return record
 
-@router.delete("/{record_id}")
+@router.delete("/{record_id}", status_code=204)
 def delete_cost_record(record_id: int, db: Session = Depends(get_db)):
-    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+    record= delete_cost_record_by_id(db, record_id)
 
     if record is None:
         raise HTTPException(status_code=404, detail="Cost record not found")
 
-    db.delete(record)
-    db.commit()
 
-    return {
-        "message": "Cost record deleted successfully",
-        "deleted_id": record_id
-    }
-
-@router.patch("/{record_id}")
-def patch_cost_record(
+@router.patch("/{record_id}", response_model=CostRecordResponse)
+def update_cost_record(
     record_id: int,
     payload: CostRecordUpdate,
     db: Session = Depends(get_db)
 ):
-    record = db.query(CostRecord).filter(CostRecord.id == record_id).first()
+
+    record = update_cost_record_by_id(db, record_id, payload)
 
     if record is None:
         raise HTTPException(status_code=404, detail="Cost record not found")
 
-    update_data = payload.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(record, key, value)
-
-    db.commit()
-    db.refresh(record)
-
-    return {
-        "message": "Cost record updated successfully",
-        "data": {
-            "id": record.id,
-            "provider": record.provider,
-            "account_name": record.account_name,
-            "service_name": record.service_name,
-            "resource_id": record.resource_id,
-            "environment": record.environment,
-            "owner": record.owner,
-            "cost_amount": record.cost_amount,
-            "currency": record.currency,
-            "usage_date": str(record.usage_date),
-        }
-    }
+    return record
